@@ -1,0 +1,104 @@
+name: Code Quality
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  lint-and-test:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [18, 20]
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+    
+    # Backend Quality Checks
+    - name: Backend - Install dependencies
+      working-directory: ./backend
+      run: npm ci
+    
+    - name: Backend - ESLint
+      working-directory: ./backend
+      run: npx eslint . --ext .js --format json --output-file eslint-report.json || true
+    
+    - name: Backend - Tests
+      working-directory: ./backend
+      run: npm test -- --coverage --reporter=json --outputFile=test-results.json
+      env:
+        NODE_ENV: test
+        JWT_SECRET: test-secret
+    
+    # Frontend Quality Checks (when frontend exists)
+    - name: Frontend - Install dependencies
+      working-directory: ./frontend
+      run: npm ci
+      continue-on-error: true
+    
+    - name: Frontend - ESLint
+      working-directory: ./frontend
+      run: npx eslint src --ext .js,.jsx,.ts,.tsx --format json --output-file eslint-report.json || true
+      continue-on-error: true
+    
+    - name: Frontend - Tests
+      working-directory: ./frontend
+      run: npm test -- --coverage --watchAll=false --testResultsProcessor=jest-sonar-reporter
+      env:
+        CI: true
+      continue-on-error: true
+    
+    # Upload test results
+    - name: Upload test results
+      uses: actions/upload-artifact@v3
+      with:
+        name: test-results-${{ matrix.node-version }}
+        path: |
+          backend/coverage/
+          backend/test-results.json
+          frontend/coverage/
+        retention-days: 30
+
+  security-audit:
+    name: Security Audit
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+    
+    - name: Backend Security Audit
+      working-directory: ./backend
+      run: |
+        npm audit --audit-level=moderate --json > audit-results.json || true
+        npm audit --audit-level=moderate
+    
+    - name: Frontend Security Audit
+      working-directory: ./frontend
+      run: |
+        npm audit --audit-level=moderate --json > audit-results.json || true
+        npm audit --audit-level=moderate
+      continue-on-error: true
+    
+    - name: Upload audit results
+      uses: actions/upload-artifact@v3
+      with:
+        name: security-audit
+        path: |
+          backend/audit-results.json
+          frontend/audit-results.json
+        retention-days: 30

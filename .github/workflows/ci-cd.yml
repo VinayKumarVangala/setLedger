@@ -1,0 +1,133 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  # Backend CI/CD
+  backend:
+    name: Backend Build & Deploy
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: backend/package-lock.json
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run linting
+      run: npm run lint --if-present
+    
+    - name: Run tests
+      run: npm test --if-present
+      env:
+        NODE_ENV: test
+        MONGO_URI: ${{ secrets.MONGO_TEST_URI }}
+        JWT_SECRET: test-secret
+    
+    - name: Build application
+      run: npm run build --if-present
+    
+    # Deploy to Render
+    - name: Deploy to Render
+      if: github.ref == 'refs/heads/main'
+      uses: johnbeynon/render-deploy-action@v0.0.8
+      with:
+        service-id: ${{ secrets.RENDER_SERVICE_ID }}
+        api-key: ${{ secrets.RENDER_API_KEY }}
+    
+    # Alternative: Deploy to Heroku
+    - name: Deploy to Heroku
+      if: github.ref == 'refs/heads/main' && secrets.HEROKU_API_KEY
+      uses: akhileshns/heroku-deploy@v3.12.14
+      with:
+        heroku_api_key: ${{ secrets.HEROKU_API_KEY }}
+        heroku_app_name: ${{ secrets.HEROKU_APP_NAME }}
+        heroku_email: ${{ secrets.HEROKU_EMAIL }}
+        appdir: "backend"
+
+  # Frontend CI/CD
+  frontend:
+    name: Frontend Build & Deploy
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./frontend
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: frontend/package-lock.json
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Run linting
+      run: npm run lint --if-present
+    
+    - name: Run tests
+      run: npm test -- --coverage --watchAll=false
+      env:
+        CI: true
+    
+    - name: Build for production
+      run: npm run build
+      env:
+        REACT_APP_API_URL: ${{ secrets.REACT_APP_API_URL }}
+        REACT_APP_FIREBASE_CONFIG: ${{ secrets.REACT_APP_FIREBASE_CONFIG }}
+        GENERATE_SOURCEMAP: false
+    
+    - name: Deploy to GitHub Pages
+      if: github.ref == 'refs/heads/main'
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./frontend/build
+        cname: ${{ secrets.CUSTOM_DOMAIN }}
+
+  # Security & Quality Checks
+  security:
+    name: Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Run Trivy vulnerability scanner
+      uses: aquasecurity/trivy-action@master
+      with:
+        scan-type: 'fs'
+        scan-ref: '.'
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+    
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
+    
+    - name: Dependency Check
+      uses: dependency-check/Dependency-Check_Action@main
+      with:
+        project: 'setLedger'
+        path: '.'
+        format: 'ALL'

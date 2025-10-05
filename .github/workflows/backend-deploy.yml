@@ -1,0 +1,43 @@
+name: Backend Deploy
+
+on:
+  push:
+    branches: [ main ]
+    paths: [ 'backend/**' ]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy Backend to Render
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+        cache: 'npm'
+        cache-dependency-path: backend/package-lock.json
+    
+    - name: Install dependencies
+      working-directory: ./backend
+      run: npm ci --only=production
+    
+    - name: Create deployment package
+      run: |
+        cd backend
+        zip -r ../backend-deploy.zip . -x "node_modules/*" "*.log" ".env*"
+    
+    - name: Deploy to Render
+      uses: johnbeynon/render-deploy-action@v0.0.8
+      with:
+        service-id: ${{ secrets.RENDER_SERVICE_ID }}
+        api-key: ${{ secrets.RENDER_API_KEY }}
+        wait-for-success: true
+    
+    - name: Health Check
+      run: |
+        sleep 30
+        curl -f ${{ secrets.BACKEND_URL }}/api/v1/health || exit 1

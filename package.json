@@ -1,0 +1,38 @@
+{
+  "name": "setledger",
+  "version": "1.0.0",
+  "description": "AI-Powered Financial Management Suite",
+  "main": "backend/src/server.js",
+  "scripts": {
+    "start": "node start.js",
+    "dev": "node start.js",
+    "backend:dev": "cd backend && npm run dev",
+    "frontend:dev": "cd frontend && npm start",
+    "ai-service": "cd ai-service && source venv/bin/activate && python3 app.py",
+    "build": "cd frontend && npm run build",
+    "build:backend": "cd backend && npm run build",
+    "deploy": "npm run build && npm run build:backend",
+    "test": "cd backend && npm test",
+    "security:audit": "node scripts/security-audit.js",
+    "security:test": "cd backend && npm run test:security",
+    "lint": "cd backend && npm run lint && cd ../frontend && npm run lint",
+    "install:all": "npm install && cd backend && npm install && cd ../frontend && npm install && cd ../ai-service && pip install -r requirements.txt"
+  },
+  "keywords": [
+    "financial",
+    "management",
+    "ai",
+    "billing",
+    "inventory",
+    "gst"
+  ],
+  "author": "setLedger Team",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^8.2.2"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  }
+}
