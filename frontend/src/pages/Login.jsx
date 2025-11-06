@@ -6,28 +6,20 @@ const Login = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
-  // const { login } = useAuth(); // Not used in simplified version
+  const { login } = useAuth();
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
+    
     try {
-      const response = await fetch('http://localhost:5000/api/v1/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password })
-      });
+      const result = await login(email, password);
       
-      const data = await response.json();
-      
-      if (data.success) {
-        // Store user data
-        localStorage.setItem('user', JSON.stringify(data.data.user));
-        localStorage.setItem('token', data.data.token);
-        // Redirect to dashboard
+      if (result.success) {
+        // AuthContext handles storage, just redirect
         window.location.href = '/dashboard';
       } else {
-        alert('Login failed: ' + data.error.message);
+        alert('Login failed: ' + (result.error?.message || 'Unknown error'));
       }
     } catch (error) {
       console.error('Login failed:', error);

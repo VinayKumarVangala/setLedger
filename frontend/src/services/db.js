@@ -21,7 +21,7 @@ class SetLedgerDB extends Dexie {
       outboxJournalEntries: '++id, operationId, operation, data, status, createdAt, syncedAt, retryCount',
       
       // Conflict resolution
-      conflicts: '++id, type, entityType, entityId, severity, status, createdAt, resolvedAt'
+      conflicts: '++id, type, entityType, entityId, severity, status, createdAt, resolvedAt',
       
       // Sync metadata
       syncStatus: '++id, table, lastSync, status'

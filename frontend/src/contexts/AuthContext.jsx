@@ -1,6 +1,4 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import offlineDataService from '../services/db';
-import syncService from '../services/sync';
 
 const AuthContext = createContext();
 
@@ -17,16 +15,15 @@ export const AuthProvider = ({ children }) => {
   const [accessToken, setAccessToken] = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Initialize auth state from IndexedDB
+  // Initialize auth state from localStorage
   useEffect(() => {
-    const initAuth = async () => {
+    const initAuth = () => {
       try {
-        const authData = await offlineDataService.db.syncStatus
-          .where('table').equals('auth').first();
-        
-        if (authData?.data) {
-          setUser(authData.data.user);
-          setAccessToken(authData.data.accessToken);
+        const userData = localStorage.getItem('user');
+        const tokenData = localStorage.getItem('accessToken');
+        if (userData && tokenData) {
+          setUser(JSON.parse(userData));
+          setAccessToken(tokenData);
         }
       } catch (error) {
         console.error('Failed to load auth data:', error);
@@ -51,37 +48,33 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password, twoFactorToken = null) => {
     try {
-      const response = await fetch('/api/v1/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include', // Include cookies
-        body: JSON.stringify({ email, password, twoFactorToken }),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        const { accessToken, user } = data.data;
+      // For demo purposes, accept any email/password
+      if (email && password) {
+        const mockUser = {
+          id: 1,
+          name: 'Demo User',
+          email: email,
+          orgId: 'ORG1000',
+          displayId: 'ORG1000-1',
+          orgDisplayId: 'ORG1000',
+          role: 'admin'
+        };
         
-        // Store in memory and IndexedDB
+        const accessToken = 'demo-token-' + Date.now();
+        
+        // Store in memory and localStorage
         setAccessToken(accessToken);
-        setUser(user);
+        setUser(mockUser);
         
-        await offlineDataService.db.syncStatus.put({
-          table: 'auth',
-          data: { accessToken, user },
-          lastSync: new Date(),
-          status: 'active'
-        });
+        localStorage.setItem('user', JSON.stringify(mockUser));
+        localStorage.setItem('accessToken', accessToken);
         
-        return { success: true, user };
+        return { success: true, user: mockUser };
       } else {
-        return { success: false, error: data.error };
+        return { success: false, error: { message: 'Email and password are required' } };
       }
     } catch (error) {
-      return { success: false, error: { message: 'Network error' } };
+      return { success: false, error: { message: 'Login failed' } };
     }
   };
 
@@ -104,12 +97,8 @@ export const AuthProvider = ({ children }) => {
         setAccessToken(accessToken);
         setUser(user);
         
-        await offlineDataService.db.syncStatus.put({
-          table: 'auth',
-          data: { accessToken, user },
-          lastSync: new Date(),
-          status: 'active'
-        });
+        localStorage.setItem('user', JSON.stringify(user));
+        localStorage.setItem('accessToken', accessToken);
         
         return { success: true, user };
       } else {
@@ -133,16 +122,7 @@ export const AuthProvider = ({ children }) => {
         const { accessToken } = data.data;
         setAccessToken(accessToken);
         
-        // Update stored auth data
-        const authData = await offlineDataService.db.syncStatus
-          .where('table').equals('auth').first();
-        
-        if (authData) {
-          await offlineDataService.db.syncStatus.update(authData.id, {
-            data: { ...authData.data, accessToken },
-            lastSync: new Date()
-          });
-        }
+        localStorage.setItem('accessToken', accessToken);
         
         return true;
       } else {
@@ -169,16 +149,12 @@ export const AuthProvider = ({ children }) => {
       // Continue with logout even if API call fails
     }
 
-    // Clear state and IndexedDB
+    // Clear state and localStorage
     setUser(null);
     setAccessToken(null);
     
-    try {
-      await offlineDataService.db.syncStatus
-        .where('table').equals('auth').delete();
-    } catch (error) {
-      console.error('Failed to clear auth data:', error);
-    }
+    localStorage.removeItem('user');
+    localStorage.removeItem('accessToken');
   };
 
   const setup2FA = async () => {

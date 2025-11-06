@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import { AuthProvider } from './contexts/AuthContext';
+import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
 import * as serviceWorker from './services/serviceWorker';
 import syncService from './services/sync';
@@ -15,35 +15,87 @@ import GST from './pages/GST';
 import Settings from './pages/Settings';
 import './styles/themes.css';
 
-function App() {
-  useEffect(() => {
-    // Register service worker for background sync
-    serviceWorker.register({
-      onSuccess: () => {
-        console.log('Service Worker registered successfully');
-        syncService.registerBackgroundSync();
-      },
-      onUpdate: () => {
-        console.log('Service Worker updated');
-      }
-    });
-  }, []);
+// Protected Route Component
+const ProtectedRoute = ({ children }) => {
+  const { isAuthenticated, loading } = useAuth();
+  
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+  
+  return isAuthenticated ? children : <Navigate to="/login" replace />;
+};
 
+// Public Route Component (redirect to dashboard if authenticated)
+const PublicRoute = ({ children }) => {
+  const { isAuthenticated, loading } = useAuth();
+  
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+  
+  return isAuthenticated ? <Navigate to="/dashboard" replace /> : children;
+};
+
+function AppContent() {
   return (
-    <ThemeProvider>
-      <AuthProvider>
-        <Router>
-        <Routes>
-          <Route path="/login" element={<Login />} />
-          <Route path="/register" element={<Register />} />
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/products" element={<Products />} />
-          <Route path="/invoices" element={<Invoices />} />
-          <Route path="/pos" element={<POS />} />
-          <Route path="/reports" element={<Reports />} />
-          <Route path="/gst" element={<GST />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="/" element={
+    <Router>
+      <Routes>
+        <Route path="/login" element={
+          <PublicRoute>
+            <Login />
+          </PublicRoute>
+        } />
+        <Route path="/register" element={
+          <PublicRoute>
+            <Register />
+          </PublicRoute>
+        } />
+        <Route path="/dashboard" element={
+          <ProtectedRoute>
+            <Dashboard />
+          </ProtectedRoute>
+        } />
+        <Route path="/products" element={
+          <ProtectedRoute>
+            <Products />
+          </ProtectedRoute>
+        } />
+        <Route path="/invoices" element={
+          <ProtectedRoute>
+            <Invoices />
+          </ProtectedRoute>
+        } />
+        <Route path="/pos" element={
+          <ProtectedRoute>
+            <POS />
+          </ProtectedRoute>
+        } />
+        <Route path="/reports" element={
+          <ProtectedRoute>
+            <Reports />
+          </ProtectedRoute>
+        } />
+        <Route path="/gst" element={
+          <ProtectedRoute>
+            <GST />
+          </ProtectedRoute>
+        } />
+        <Route path="/settings" element={
+          <ProtectedRoute>
+            <Settings />
+          </ProtectedRoute>
+        } />
+        <Route path="/" element={
+          <PublicRoute>
             <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
               <div className="text-center">
                 <h1 className="text-4xl font-bold text-gray-900 dark:text-white mb-4">
@@ -70,10 +122,31 @@ function App() {
                 </div>
               </div>
             </div>
-          } />
+          </PublicRoute>
+        } />
+      </Routes>
+    </Router>
+  );
+}
 
-        </Routes>
-        </Router>
+function App() {
+  useEffect(() => {
+    // Register service worker for background sync
+    serviceWorker.register({
+      onSuccess: () => {
+        console.log('Service Worker registered successfully');
+        syncService.registerBackgroundSync();
+      },
+      onUpdate: () => {
+        console.log('Service Worker updated');
+      }
+    });
+  }, []);
+
+  return (
+    <ThemeProvider>
+      <AuthProvider>
+        <AppContent />
       </AuthProvider>
     </ThemeProvider>
   );

@@ -5,6 +5,8 @@
   "main": "backend/src/server.js",
   "scripts": {
     "start": "node start.js",
+    "start-all": "bash -c 'source venv/bin/activate && concurrently \"cd backend && npm start\" \"cd frontend && npm start\" \"cd ai-service && source venv/bin/activate && python3 app.py\"'",
+    "setup": "node scripts/setup-env.js",
     "dev": "node start.js",
     "backend:dev": "cd backend && npm run dev",
     "frontend:dev": "cd frontend && npm start",
