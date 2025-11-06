@@ -812,6 +812,91 @@ app.get('/api/datasets/metadata', verifyToken, async (req, res) => {
   }
 });
 
+// Credit summary endpoint
+app.get('/api/credit/summary', verifyToken, async (req, res) => {
+  try {
+    const CreditLedger = require('./models/creditLedger');
+    const AICreditService = require('./services/aiCreditService');
+    
+    const [totalReceivables, overdueAmounts, upcomingPayments, riskScores] = await Promise.all([
+      CreditLedger.aggregate([
+        { $match: { orgId: req.user.orgId, status: { $in: ['pending', 'partial'] } } },
+        { $group: { _id: null, total: { $sum: '$balanceAmount' }, count: { $sum: 1 } } }
+      ]),
+      CreditLedger.aggregate([
+        { $match: { orgId: req.user.orgId, status: 'overdue' } },
+        { $group: { _id: null, total: { $sum: '$balanceAmount' }, count: { $sum: 1 } } }
+      ]),
+      CreditLedger.aggregate([
+        { $match: { orgId: req.user.orgId, dueDate: { $gte: new Date(), $lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) } } },
+        { $group: { _id: null, total: { $sum: '$balanceAmount' }, count: { $sum: 1 } } }
+      ]),
+      CreditLedger.find({ orgId: req.user.orgId }).distinct('customerId')
+    ]);
+    
+    // Calculate average risk score
+    let avgRiskScore = 50;
+    if (riskScores.length > 0) {
+      const scores = await Promise.all(
+        riskScores.slice(0, 10).map(async (customerId) => {
+          const metrics = await AICreditService.getCustomerCreditMetrics(req.user.orgId, customerId);
+          const prediction = await AICreditService.predictCreditRisk(metrics);
+          return prediction.creditRiskScore || 50;
+        })
+      );
+      avgRiskScore = Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+    }
+    
+    res.json({
+      success: true,
+      data: {
+        totalReceivables: {
+          amount: totalReceivables[0]?.total || 0,
+          count: totalReceivables[0]?.count || 0
+        },
+        overdueAmounts: {
+          amount: overdueAmounts[0]?.total || 0,
+          count: overdueAmounts[0]?.count || 0
+        },
+        upcomingPayments: {
+          amount: upcomingPayments[0]?.total || 0,
+          count: upcomingPayments[0]?.count || 0
+        },
+        averageRiskScore: avgRiskScore,
+        totalCustomers: riskScores.length
+      }
+    });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      error: { code: 'CREDIT_SUMMARY_ERROR', message: error.message } 
+    });
+  }
+});
+
+// Reminder logs endpoint
+app.get('/api/reminders/logs', verifyToken, async (req, res) => {
+  try {
+    const ReminderLog = require('./models/reminderLog');
+    const { limit = 50, status, mode } = req.query;
+    
+    const filter = { orgId: req.user.orgId };
+    if (status) filter.status = status;
+    if (mode) filter.mode = mode;
+    
+    const logs = await ReminderLog.find(filter)
+      .sort({ reminderDate: -1 })
+      .limit(parseInt(limit));
+    
+    res.json({ success: true, data: logs });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      error: { code: 'REMINDER_LOGS_ERROR', message: error.message } 
+    });
+  }
+});
+
 app.post('/api/customer/analyzeBehavior', verifyToken, async (req, res) => {
   try {
     const CreditInsights = require('./utils/creditInsights');

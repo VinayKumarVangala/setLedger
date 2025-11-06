@@ -34,6 +34,8 @@ class ReminderJob {
   }
 
   static async sendReminderEmail(credit) {
+    const ReminderLog = require('../models/reminderLog');
+    
     try {
       const transporter = nodemailer.createTransporter({
         service: 'gmail',
@@ -54,16 +56,45 @@ class ReminderJob {
         .replace('{{dueDate}}', credit.dueDate.toLocaleDateString())
         .replace('{{daysOverdue}}', Math.floor((new Date() - credit.dueDate) / (1000 * 60 * 60 * 24)));
 
+      const recipient = credit.customerId.includes('@') ? credit.customerId : `${credit.customerId}@example.com`;
       const mailOptions = {
         from: process.env.EMAIL_USER,
-        to: credit.customerId.includes('@') ? credit.customerId : `${credit.customerId}@example.com`,
+        to: recipient,
         subject: `Payment Reminder - Invoice ${credit.invoiceId}`,
         html: htmlTemplate
       };
 
       await transporter.sendMail(mailOptions);
+      
+      // Log successful reminder
+      await ReminderLog.create({
+        orgId: credit.orgId,
+        customerId: credit.customerId,
+        customerName: credit.customerId,
+        invoiceId: credit.invoiceId,
+        mode: 'Email',
+        status: 'Sent',
+        details: {
+          subject: mailOptions.subject,
+          recipient: recipient
+        }
+      });
+      
       console.log(`📧 Reminder sent for credit ${credit._id}`);
     } catch (error) {
+      // Log failed reminder
+      await ReminderLog.create({
+        orgId: credit.orgId,
+        customerId: credit.customerId,
+        customerName: credit.customerId,
+        invoiceId: credit.invoiceId,
+        mode: 'Email',
+        status: 'Failed',
+        details: {
+          errorMessage: error.message
+        }
+      });
+      
       console.error(`❌ Failed to send reminder for credit ${credit._id}:`, error);
     }
   }
