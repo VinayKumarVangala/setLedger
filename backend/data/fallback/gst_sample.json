@@ -1,0 +1,20 @@
+{
+  "gstRates": [
+    { "code": "GST_0", "rate": 0, "category": "Essential Items", "items": ["Rice", "Wheat", "Milk", "Fruits", "Vegetables"] },
+    { "code": "GST_5", "rate": 5, "category": "Basic Necessities", "items": ["Sugar", "Tea", "Coffee", "Spices", "Medicines"] },
+    { "code": "GST_12", "rate": 12, "category": "Standard Items", "items": ["Processed Food", "Ayurvedic Medicines", "Fertilizers"] },
+    { "code": "GST_18", "rate": 18, "category": "Regular Goods", "items": ["Electronics", "Textiles", "Soaps", "Toothpaste"] },
+    { "code": "GST_28", "rate": 28, "category": "Luxury Items", "items": ["Cars", "Tobacco", "Aerated Drinks", "Luxury Watches"] }
+  ],
+  "exemptions": ["Educational Services", "Healthcare Services", "Agricultural Products", "Books", "Newspapers"],
+  "hsnCodes": {
+    "1001": { "description": "Wheat", "gstRate": 0 },
+    "1006": { "description": "Rice", "gstRate": 0 },
+    "8517": { "description": "Mobile Phones", "gstRate": 18 },
+    "8703": { "description": "Motor Cars", "gstRate": 28 }
+  },
+  "stateMapping": {
+    "intraState": { "cgst": true, "sgst": true, "igst": false },
+    "interState": { "cgst": false, "sgst": false, "igst": true }
+  }
+}

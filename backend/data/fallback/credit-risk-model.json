@@ -1,0 +1,18 @@
+{
+  "model": {
+    "type": "logistic_regression",
+    "coefficients": [0.2, 0.5, 0.8, -0.1],
+    "intercept": -0.3,
+    "features": ["avgPaymentDelay", "creditLimitUsage", "overdueRatio", "transactionVolume"]
+  },
+  "riskThresholds": {
+    "low": 30,
+    "moderate": 70,
+    "high": 100
+  },
+  "defaultPrediction": {
+    "creditRiskScore": 50,
+    "riskLevel": "Moderate"
+  },
+  "lastUpdated": "2024-01-15T00:00:00Z"
+}

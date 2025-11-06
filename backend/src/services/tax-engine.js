@@ -133,11 +133,23 @@ class TaxEngine {
   }
   
   static async getTaxRates() {
-    return Object.entries(this.GST_RATES).map(([key, value]) => ({
-      code: key,
-      rate: value,
-      display: value === 0 ? 'Exempt' : `${value}%`
-    }));
+    const FallbackService = require('./fallbackService');
+    
+    const apiCall = async () => {
+      return Object.entries(this.GST_RATES).map(([key, value]) => ({
+        code: key,
+        rate: value,
+        display: value === 0 ? 'Exempt' : `${value}%`
+      }));
+    };
+
+    try {
+      const result = await FallbackService.getData(apiCall, 'gst-rates.json');
+      return result.data.gstRates || result.data;
+    } catch (error) {
+      console.error('GST API Error:', error.message);
+      return FallbackService.loadFallbackData('gst-rates.json')?.gstRates || [];
+    }
   }
   
   static validateGSTNumber(gstNumber) {

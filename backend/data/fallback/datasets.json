@@ -1,0 +1,70 @@
+{
+  "metadata": {
+    "version": "1.0.0",
+    "description": "Fallback datasets for setLedger resilience system",
+    "maintainer": "setLedger Team",
+    "lastUpdated": "2024-01-15T00:00:00Z"
+  },
+  "datasets": {
+    "gst-rates.json": {
+      "version": "1.2.0",
+      "description": "GST rate categories and tax calculations for Indian market",
+      "type": "json",
+      "size": "2.1KB",
+      "lastUpdated": "2024-01-15T00:00:00Z",
+      "source": "Government GST Portal",
+      "updateFrequency": "quarterly",
+      "fields": ["gstRates", "exemptions", "hsnCodes", "stateMapping"]
+    },
+    "gst_sample.json": {
+      "version": "1.0.0", 
+      "description": "Comprehensive GST sample data with HSN codes and state mapping",
+      "type": "json",
+      "size": "3.5KB",
+      "lastUpdated": "2024-01-15T00:00:00Z",
+      "source": "Sample Data Generator",
+      "updateFrequency": "monthly",
+      "fields": ["gstRates", "exemptions", "hsnCodes", "stateMapping"]
+    },
+    "finance_backup.csv": {
+      "version": "1.1.0",
+      "description": "Monthly financial KPI backup data for analytics fallback",
+      "type": "csv",
+      "size": "1.8KB",
+      "lastUpdated": "2024-01-15T00:00:00Z",
+      "source": "Financial Analytics Engine",
+      "updateFrequency": "monthly",
+      "fields": ["month", "orgId", "revenue", "expenses", "netProfit", "taxCollected", "invoiceCount", "paidCount"]
+    },
+    "ai_forecast_backup.csv": {
+      "version": "1.0.0",
+      "description": "Customer risk assessment and behavior analysis backup data",
+      "type": "csv", 
+      "size": "1.2KB",
+      "lastUpdated": "2024-01-15T00:00:00Z",
+      "source": "AI Credit Risk Engine",
+      "updateFrequency": "weekly",
+      "fields": ["customerId", "avgPaymentDelay", "creditLimitUsage", "overdueRatio", "transactionVolume", "creditRiskScore", "riskLevel", "behaviorCategory"]
+    },
+    "credit-risk-model.json": {
+      "version": "2.1.0",
+      "description": "Logistic regression model parameters for credit risk prediction",
+      "type": "json",
+      "size": "0.8KB", 
+      "lastUpdated": "2024-01-15T00:00:00Z",
+      "source": "ML Training Pipeline",
+      "updateFrequency": "weekly",
+      "fields": ["model", "riskThresholds", "defaultPrediction"]
+    },
+    "analytics-data.json": {
+      "version": "1.0.0",
+      "description": "Default analytics values and behavior categorization rules",
+      "type": "json",
+      "size": "1.0KB",
+      "lastUpdated": "2024-01-15T00:00:00Z", 
+      "source": "Analytics Engine",
+      "updateFrequency": "monthly",
+      "fields": ["kpiDefaults", "behaviorCategories", "defaultMetrics"]
+    }
+  }
+}

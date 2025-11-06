@@ -790,6 +790,28 @@ app.get('/api/system/logs', verifyToken, async (req, res) => {
 });
 
 // Customer behavior analysis endpoint
+// Dataset management endpoint
+app.get('/api/datasets/metadata', verifyToken, async (req, res) => {
+  try {
+    const FallbackService = require('./services/fallbackService');
+    const metadata = FallbackService.getDatasetMetadata();
+    
+    if (!metadata) {
+      return res.status(404).json({
+        success: false,
+        error: { code: 'METADATA_NOT_FOUND', message: 'Dataset metadata not available' }
+      });
+    }
+    
+    res.json({ success: true, data: metadata });
+  } catch (error) {
+    res.status(500).json({ 
+      success: false, 
+      error: { code: 'METADATA_ERROR', message: error.message } 
+    });
+  }
+});
+
 app.post('/api/customer/analyzeBehavior', verifyToken, async (req, res) => {
   try {
     const CreditInsights = require('./utils/creditInsights');

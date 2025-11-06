@@ -4,41 +4,54 @@ const prisma = new PrismaClient();
 class FinancialSummaryService {
   // Get KPI data from materialized views
   static async getKPIData(orgUUID, timeframe = 'monthly', limit = 12) {
-    const viewName = timeframe === 'quarterly' ? 'quarterly_financial_kpis' : 'monthly_financial_kpis';
-    const timeColumn = timeframe === 'quarterly' ? 'quarter' : 'month';
+    const FallbackService = require('./fallbackService');
     
-    const [kpis, expenses] = await Promise.all([
-      prisma.$queryRaw`
-        SELECT ${timeColumn}, revenue, tax_collected, cgst, sgst, igst, invoice_count, paid_count
-        FROM ${viewName}
-        WHERE organization_id = ${orgUUID}
-        ORDER BY ${timeColumn} DESC
-        LIMIT ${limit}
-      `,
-      prisma.$queryRaw`
-        SELECT month, total_expenses, expense_count
-        FROM monthly_expenses
-        WHERE organization_id = ${orgUUID}
-        ORDER BY month DESC
-        LIMIT ${limit}
-      `
-    ]);
+    const apiCall = async () => {
+      const viewName = timeframe === 'quarterly' ? 'quarterly_financial_kpis' : 'monthly_financial_kpis';
+      const timeColumn = timeframe === 'quarterly' ? 'quarter' : 'month';
+      
+      const [kpis, expenses] = await Promise.all([
+        prisma.$queryRaw`
+          SELECT ${timeColumn}, revenue, tax_collected, cgst, sgst, igst, invoice_count, paid_count
+          FROM ${viewName}
+          WHERE organization_id = ${orgUUID}
+          ORDER BY ${timeColumn} DESC
+          LIMIT ${limit}
+        `,
+        prisma.$queryRaw`
+          SELECT month, total_expenses, expense_count
+          FROM monthly_expenses
+          WHERE organization_id = ${orgUUID}
+          ORDER BY month DESC
+          LIMIT ${limit}
+        `
+      ]);
 
-    return kpis.map(kpi => {
-      const expense = expenses.find(e => e.month.getTime() === kpi[timeColumn].getTime()) || { total_expenses: 0 };
-      return {
-        period: kpi[timeColumn],
-        revenue: Number(kpi.revenue) || 0,
-        expenses: Number(expense.total_expenses) || 0,
-        netProfit: (Number(kpi.revenue) || 0) - (Number(expense.total_expenses) || 0) - (Number(kpi.tax_collected) || 0),
-        taxCollected: Number(kpi.tax_collected) || 0,
-        cgst: Number(kpi.cgst) || 0,
-        sgst: Number(kpi.sgst) || 0,
-        igst: Number(kpi.igst) || 0,
-        invoiceCount: Number(kpi.invoice_count) || 0,
-        paidCount: Number(kpi.paid_count) || 0
-      };
-    }).reverse();
+      return kpis.map(kpi => {
+        const expense = expenses.find(e => e.month.getTime() === kpi[timeColumn].getTime()) || { total_expenses: 0 };
+        return {
+          period: kpi[timeColumn],
+          revenue: Number(kpi.revenue) || 0,
+          expenses: Number(expense.total_expenses) || 0,
+          netProfit: (Number(kpi.revenue) || 0) - (Number(expense.total_expenses) || 0) - (Number(kpi.tax_collected) || 0),
+          taxCollected: Number(kpi.tax_collected) || 0,
+          cgst: Number(kpi.cgst) || 0,
+          sgst: Number(kpi.sgst) || 0,
+          igst: Number(kpi.igst) || 0,
+          invoiceCount: Number(kpi.invoice_count) || 0,
+          paidCount: Number(kpi.paid_count) || 0
+        };
+      }).reverse();
+    };
+
+    try {
+      const result = await FallbackService.getData(apiCall, 'analytics-data.json');
+      return result.data;
+    } catch (error) {
+      console.error('Analytics API Error:', error.message);
+      const fallbackData = FallbackService.loadFallbackData('analytics-data.json');
+      return [fallbackData?.kpiDefaults || { revenue: 0, expenses: 0, netProfit: 0 }];
+    }
   }
 
   // Get pre-aggregated financial summary

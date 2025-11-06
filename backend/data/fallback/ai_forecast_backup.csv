@@ -1,0 +1,13 @@
+customerId,avgPaymentDelay,creditLimitUsage,overdueRatio,transactionVolume,creditRiskScore,riskLevel,behaviorCategory
+CUST001,2,0.25,0.05,125000,25,Low,Reliable
+CUST002,8,0.45,0.15,85000,45,Moderate,Moderate
+CUST003,15,0.75,0.35,45000,75,High,Risky
+CUST004,1,0.15,0.02,200000,18,Low,Reliable
+CUST005,12,0.65,0.25,65000,68,Moderate,Risky
+CUST006,5,0.35,0.08,95000,35,Moderate,Moderate
+CUST007,20,0.85,0.45,25000,85,High,Risky
+CUST008,3,0.20,0.03,150000,22,Low,Reliable
+CUST009,10,0.55,0.18,75000,52,Moderate,Moderate
+CUST010,18,0.80,0.40,35000,82,High,Risky
+CUST011,4,0.30,0.06,110000,28,Low,Reliable
+CUST012,14,0.70,0.30,55000,72,High,Risky

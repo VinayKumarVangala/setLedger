@@ -1,0 +1,11 @@
+{
+  "gstRates": [
+    { "category": "Essential Items", "rate": 0, "items": ["Rice", "Wheat", "Milk"] },
+    { "category": "Basic Necessities", "rate": 5, "items": ["Sugar", "Tea", "Coffee"] },
+    { "category": "Standard Items", "rate": 12, "items": ["Processed Food", "Medicines"] },
+    { "category": "Regular Goods", "rate": 18, "items": ["Electronics", "Textiles"] },
+    { "category": "Luxury Items", "rate": 28, "items": ["Cars", "Tobacco", "Aerated Drinks"] }
+  ],
+  "exemptions": ["Educational Services", "Healthcare", "Agricultural Products"],
+  "lastUpdated": "2024-01-15T00:00:00Z"
+}

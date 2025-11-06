@@ -2,7 +2,9 @@ const axios = require('axios');
 
 class AICreditService {
   static async predictCreditRisk(customerData) {
-    try {
+    const FallbackService = require('./fallbackService');
+    
+    const apiCall = async () => {
       const aiServiceUrl = process.env.AI_SERVICE_URL || 'http://localhost:5001';
       
       const response = await axios.post(`${aiServiceUrl}/predict-credit-risk`, {
@@ -16,12 +18,24 @@ class AICreditService {
       });
 
       return response.data.data;
+    };
+
+    try {
+      const result = await FallbackService.getData(apiCall, 'credit-risk-model.json');
+      
+      if (result.source === 'fallback') {
+        return {
+          creditRiskScore: this.calculateFallbackScore(customerData),
+          riskLevel: 'Moderate',
+          fallback: true
+        };
+      }
+      
+      return result.data;
     } catch (error) {
       console.error('AI Credit Service Error:', error.message);
-      
-      // Fallback scoring if AI service is unavailable
       return {
-        creditRiskScore: this.calculateFallbackScore(customerData),
+        creditRiskScore: 50,
         riskLevel: 'Moderate',
         fallback: true
       };

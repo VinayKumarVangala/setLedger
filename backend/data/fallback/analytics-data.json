@@ -1,0 +1,21 @@
+{
+  "kpiDefaults": {
+    "revenue": 0,
+    "expenses": 0,
+    "netProfit": 0,
+    "taxCollected": 0,
+    "invoiceCount": 0
+  },
+  "behaviorCategories": {
+    "reliable": { "minScore": 75, "creditMultiplier": 1.2 },
+    "moderate": { "minScore": 50, "creditMultiplier": 1.0 },
+    "risky": { "minScore": 0, "creditMultiplier": 0.8 }
+  },
+  "defaultMetrics": {
+    "totalTransactions": 0,
+    "avgPaymentDelay": 0,
+    "overdueRate": 0,
+    "paymentReliability": 0.5
+  },
+  "lastUpdated": "2024-01-15T00:00:00Z"
+}
