@@ -1,27 +1,30 @@
-const mongoose = require('mongoose');
-const { MongoMemoryServer } = require('mongodb-memory-server');
+// Jest setup file
+process.env.NODE_ENV = 'test';
+process.env.JWT_SECRET = 'test-secret';
+process.env.JWT_REFRESH_SECRET = 'test-refresh-secret';
+process.env.KMS_KEY = 'test-kms-key';
+process.env.EMAIL_USER = 'test@example.com';
+process.env.EMAIL_PASS = 'test-password';
 
-let mongoServer;
+// Mock console methods to reduce test noise
+global.console = {
+  ...console,
+  log: jest.fn(),
+  warn: jest.fn(),
+  error: jest.fn()
+};
 
-beforeAll(async () => {
-  mongoServer = await MongoMemoryServer.create();
-  const mongoUri = mongoServer.getUri();
-  
-  await mongoose.connect(mongoUri, {
-    useNewUrlParser: true,
-    useUnifiedTopology: true,
-  });
-});
-
-afterAll(async () => {
-  await mongoose.disconnect();
-  await mongoServer.stop();
-});
-
-afterEach(async () => {
-  const collections = mongoose.connection.collections;
-  for (const key in collections) {
-    const collection = collections[key];
-    await collection.deleteMany({});
+// Mock Date for consistent testing
+const mockDate = new Date('2024-01-15T10:00:00Z');
+global.Date = class extends Date {
+  constructor(...args) {
+    if (args.length === 0) {
+      return mockDate;
+    }
+    return new Date(...args);
   }
-});
+  
+  static now() {
+    return mockDate.getTime();
+  }
+};

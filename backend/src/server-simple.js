@@ -721,6 +721,7 @@ app.put('/api/v1/user/profile', verifyToken, (req, res) => {
 const InvoiceController = require('./controllers/invoiceController');
 const CreditController = require('./controllers/creditController');
 const AICreditService = require('./services/aiCreditService');
+const FallbackService = require('./services/fallbackService');
 
 // Financial API endpoints
 app.post('/api/v1/invoices', verifyToken, InvoiceController.createInvoice);
@@ -793,7 +794,6 @@ app.get('/api/system/logs', verifyToken, async (req, res) => {
 // Dataset management endpoint
 app.get('/api/datasets/metadata', verifyToken, async (req, res) => {
   try {
-    const FallbackService = require('./services/fallbackService');
     const metadata = FallbackService.getDatasetMetadata();
     
     if (!metadata) {
@@ -808,6 +808,60 @@ app.get('/api/datasets/metadata', verifyToken, async (req, res) => {
     res.status(500).json({ 
       success: false, 
       error: { code: 'METADATA_ERROR', message: error.message } 
+    });
+  }
+});
+
+// API failure simulation endpoints for testing
+app.post('/api/test/simulate-outage', verifyToken, (req, res) => {
+  FallbackService.enableTestMode();
+  res.json({ 
+    success: true, 
+    data: { message: 'API failure simulation enabled', mode: 'outage' } 
+  });
+});
+
+app.post('/api/test/restore-service', verifyToken, (req, res) => {
+  FallbackService.disableTestMode();
+  res.json({ 
+    success: true, 
+    data: { message: 'API failure simulation disabled', mode: 'normal' } 
+  });
+});
+
+// Test endpoint to verify fallback behavior
+app.get('/api/test/fallback-demo', verifyToken, async (req, res) => {
+  try {
+    // Simulate GST API call with fallback
+    const gstData = await FallbackService.getData(
+      async () => {
+        // Simulate external GST API call
+        throw new Error('GST API unavailable');
+      },
+      'gst-rates.json'
+    );
+    
+    // Simulate financial analytics API call with fallback
+    const analyticsData = await FallbackService.getData(
+      async () => {
+        // Simulate external analytics API call
+        throw new Error('Analytics service down');
+      },
+      'analytics-data.json'
+    );
+    
+    res.json({
+      success: true,
+      data: {
+        gst: { ...gstData, recordCount: Array.isArray(gstData.data) ? gstData.data.length : Object.keys(gstData.data).length },
+        analytics: { ...analyticsData, recordCount: Array.isArray(analyticsData.data) ? analyticsData.data.length : Object.keys(analyticsData.data).length },
+        timestamp: new Date().toISOString()
+      }
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      error: { code: 'FALLBACK_TEST_ERROR', message: error.message }
     });
   }
 });

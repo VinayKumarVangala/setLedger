@@ -2,8 +2,15 @@ const fs = require('fs');
 const path = require('path');
 
 class FallbackService {
+  static forceApiFailure = process.env.FORCE_API_FAILURE === 'true';
+  
   static async getData(apiFn, fallbackFile) {
     try {
+      // Force API failure for testing if enabled
+      if (this.forceApiFailure) {
+        throw new Error('Simulated API outage for testing');
+      }
+      
       // Attempt API call first
       const result = await apiFn();
       return { data: result, source: 'api' };
@@ -64,11 +71,26 @@ class FallbackService {
 
   static async withFallback(apiCall, fallbackData) {
     try {
+      // Force API failure for testing if enabled
+      if (this.forceApiFailure) {
+        throw new Error('Simulated API outage for testing');
+      }
+      
       return await apiCall();
     } catch (error) {
       console.warn('API call failed, using provided fallback data');
       return fallbackData;
     }
+  }
+  
+  static enableTestMode() {
+    this.forceApiFailure = true;
+    console.log('🔴 API Failure Test Mode ENABLED - All API calls will fail');
+  }
+  
+  static disableTestMode() {
+    this.forceApiFailure = false;
+    console.log('🟢 API Failure Test Mode DISABLED - Normal operation resumed');
   }
 }
 

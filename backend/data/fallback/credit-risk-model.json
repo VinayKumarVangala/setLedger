@@ -6,13 +6,15 @@
     "features": ["avgPaymentDelay", "creditLimitUsage", "overdueRatio", "transactionVolume"]
   },
   "riskThresholds": {
-    "low": 30,
-    "moderate": 70,
-    "high": 100
+    "paymentDelay": { "medium": 15, "high": 30 },
+    "overdueRatio": { "medium": 0.2, "high": 0.4 },
+    "creditUsage": { "medium": 0.7, "high": 0.9 }
   },
   "defaultPrediction": {
+    "baseScore": 55,
     "creditRiskScore": 50,
-    "riskLevel": "Moderate"
+    "riskLevel": "moderate",
+    "confidence": 0.75
   },
   "lastUpdated": "2024-01-15T00:00:00Z"
 }

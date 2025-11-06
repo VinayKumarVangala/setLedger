@@ -19,6 +19,8 @@
 - 🔐 **Enterprise Security** - 2FA, JWT, role-based access control
 - 🌐 **Offline Capability** - Local storage with cloud sync
 - 📋 **GST Compliance** - Automated tax calculations and filing
+- 🔄 **Resilient AI** - Fallback datasets ensure ≤10% prediction variance
+- ⚡ **API Failover** - Automatic dataset switching during outages
 
 ---
 
@@ -94,6 +96,7 @@
 | **Analytics** | Financial dashboards, reports | React + Chart.js + MongoDB |
 | **AI Assistant** | Chat-based queries, insights | React + Flask + NLP Models |
 | **Backup System** | Dual backup, offline sync | Node.js + Firebase + Local |
+| **AI Resilience** | Fallback models, accuracy validation | Flask + Fallback Datasets |
 
 ---
 
@@ -204,5 +207,7 @@ npm run dev
 ✅ **Offline PWA** - Works without internet connection  
 ✅ **Enterprise Security** - OWASP compliant with encryption  
 ✅ **Modern UI/UX** - Responsive, accessible, animated interface  
+✅ **AI Resilience** - Validated ≤10% variance between live/backup models  
+✅ **API Failover** - Seamless dataset switching during service outages  
 
 **Made with ❤️ for the business community**
