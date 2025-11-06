@@ -1,0 +1,276 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Organization {
+  id          String   @id @default(uuid())
+  displayId   String   @unique
+  name        String
+  settings    Json     @default("{}")
+  memberCount Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  users          User[]
+  invoices       Invoice[]
+  products       Product[]
+  stockMoves     StockMove[]
+  reservations   Reservation[]
+  journalEntries JournalEntry[]
+  transactions   Transaction[]
+  conflicts      Conflict[]
+  auditLogs      AuditLog[]
+
+  @@map("orgs")
+}
+
+model User {
+  id               String   @id @default(uuid())
+  displayId        String   @unique
+  name             String
+  email            String   @unique
+  password         String
+  role             String   @default("staff")
+  twoFactorEnabled Boolean  @default(false)
+  twoFactorSecret  String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("users")
+}
+
+model Product {
+  id             String   @id @default(uuid())
+  displayId      String   @unique
+  name           String
+  sku            String?
+  price          Decimal  @db.Decimal(10, 2)
+  stock          Int      @default(0)
+  version        Int      @default(1)
+  isPerishable   Boolean  @default(false)
+  mfdDate        DateTime?
+  expiryDate     DateTime?
+  gstRate        Decimal  @db.Decimal(5, 2) @default(18.00)
+  hsnCode        String?
+  isGSTInclusive Boolean  @default(false)
+  exemptFromGST  Boolean  @default(false)
+  metadata       Json     @default("{}")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  invoiceLines InvoiceLine[]
+  stockMoves   StockMove[]
+  reservations Reservation[]
+
+  @@map("products")
+}
+
+model Invoice {
+  id             String   @id @default(uuid())
+  displayId      String   @unique
+  customerName   String?
+  customerMobile String?
+  subtotal       Decimal  @db.Decimal(10, 2)
+  taxAmount      Decimal  @db.Decimal(10, 2) @default(0)
+  discount       Decimal  @db.Decimal(10, 2) @default(0)
+  total          Decimal  @db.Decimal(10, 2)
+  status         String   @default("draft")
+  paymentMethod  String   @default("cash")
+  dueDate        DateTime?
+  paidAmount     Decimal  @db.Decimal(10, 2) @default(0)
+  isCredit       Boolean  @default(false)
+  creditId       String?
+  paymentStatus  String   @default("pending")
+  metadata       Json     @default("{}")
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  lines InvoiceLine[]
+
+  @@map("invoices")
+}
+
+model InvoiceLine {
+  id         String  @id @default(uuid())
+  quantity   Int
+  price      Decimal @db.Decimal(10, 2)
+  total      Decimal @db.Decimal(10, 2)
+  baseAmount Decimal @db.Decimal(10, 2) @default(0)
+  taxAmount  Decimal @db.Decimal(10, 2) @default(0)
+  cgst       Decimal @db.Decimal(10, 2) @default(0)
+  sgst       Decimal @db.Decimal(10, 2) @default(0)
+  igst       Decimal @db.Decimal(10, 2) @default(0)
+  gstRate    Decimal @db.Decimal(5, 2) @default(0)
+  hsnCode    String?
+
+  invoiceId String
+  invoice   Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+
+  @@map("invoice_lines")
+}
+
+model StockMove {
+  id            String   @id @default(uuid())
+  displayId     String   @unique
+  moveType      String   // 'in', 'out', 'adjustment'
+  quantity      Int
+  reference     String?  // Invoice ID, PO ID, etc.
+  description   String?
+  metadata      Json     @default("{}")
+  transactionId String   // UUID for tracking related operations
+  createdAt     DateTime @default(now())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  @@map("stock_moves")
+}
+
+model Reservation {
+  id            String   @id @default(uuid())
+  displayId     String   @unique
+  quantity      Int
+  status        String   @default("active") // 'active', 'fulfilled', 'cancelled'
+  reference     String?  // Order ID, Quote ID, etc.
+  expiresAt     DateTime?
+  metadata      Json     @default("{}")
+  transactionId String   // UUID for tracking related operations
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  productId String
+  product   Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  @@map("reservations")
+}
+
+model JournalEntry {
+  id            String   @id @default(uuid())
+  displayId     String   @unique
+  accountName   String
+  accountType   String   // 'asset', 'liability', 'equity', 'revenue', 'expense'
+  debit         Decimal  @db.Decimal(10, 2) @default(0)
+  credit        Decimal  @db.Decimal(10, 2) @default(0)
+  reference     String?  // Invoice ID, Payment ID, etc.
+  description   String?
+  metadata      Json     @default("{}")
+  transactionId String   // UUID for tracking related operations
+  createdAt     DateTime @default(now())
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  transaction Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  @@map("journal_entries")
+}
+
+model Transaction {
+  id          String   @id @default(uuid())
+  displayId   String   @unique
+  operation   String   // 'invoice_create', 'stock_move', 'reservation', etc.
+  status      String   @default("pending") // 'pending', 'completed', 'failed', 'rolled_back'
+  metadata    Json     @default("{}")
+  createdAt   DateTime @default(now())
+  completedAt DateTime?
+
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  journalEntries JournalEntry[]
+  stockMoves     StockMove[]
+  reservations   Reservation[]
+
+  @@map("transactions")
+}
+
+model SyncLog {
+  id          String   @id @default(cuid())
+  operationId String   @unique
+  entityType  String   // PRODUCT, INVOICE, PAYMENT
+  entityId    String
+  orgUUID     String
+  action      String   // CREATE, UPDATE, DELETE, QR_METADATA_UPDATE
+  status      String   // PENDING, SYNCED, FAILED, COMPLETED
+  data        Json?
+  metadata    String?  // JSON string for QR metadata updates
+  userId      String?
+  timestamp   DateTime @default(now())
+  syncedAt    DateTime?
+  error       String?
+  
+  @@map("sync_logs")
+}
+
+model Conflict {
+  id             String   @id @default(uuid())
+  type           String   // STOCK_CONFLICT, DATA_CONFLICT
+  entityType     String   // PRODUCT, INVOICE, etc.
+  entityId       String
+  localData      String   // JSON string
+  serverData     String   // JSON string
+  severity       String   // LOW, MEDIUM, HIGH, CRITICAL
+  status         String   @default("pending") // pending, resolved, ignored
+  resolution     String?  // JSON string of resolution details
+  resolvedBy     String?
+  resolvedAt     DateTime?
+  createdAt      DateTime @default(now())
+  
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  @@map("conflicts")
+}
+
+model AuditLog {
+  id             String   @id @default(uuid())
+  entityType     String
+  entityId       String
+  action         String
+  changes        String   // JSON string
+  userId         String
+  timestamp      DateTime @default(now())
+  
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  @@map("audit_logs")
+}
+
+model RowLock {
+  id        String   @id
+  tableName String
+  recordId  String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  
+  @@unique([tableName, recordId])
+  @@map("row_locks")
+}

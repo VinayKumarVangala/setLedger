@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import { ThemeProvider } from './contexts/ThemeContext';
+import * as serviceWorker from './services/serviceWorker';
+import syncService from './services/sync';
 import Login from './pages/Login';
 import Register from './pages/Register';
 import Dashboard from './pages/Dashboard';
@@ -14,6 +16,19 @@ import Settings from './pages/Settings';
 import './styles/themes.css';
 
 function App() {
+  useEffect(() => {
+    // Register service worker for background sync
+    serviceWorker.register({
+      onSuccess: () => {
+        console.log('Service Worker registered successfully');
+        syncService.registerBackgroundSync();
+      },
+      onUpdate: () => {
+        console.log('Service Worker updated');
+      }
+    });
+  }, []);
+
   return (
     <ThemeProvider>
       <AuthProvider>

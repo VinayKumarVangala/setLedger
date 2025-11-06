@@ -13,7 +13,8 @@ const Products = () => {
 
   const generateQRData = (product) => {
     return JSON.stringify({
-      id: product.id,
+      uuid: product.uuid,
+      displayId: product.displayId,
       name: product.name,
       price: product.price,
       sku: product.sku,
@@ -25,8 +26,11 @@ const Products = () => {
 
   const handleAddProduct = (e) => {
     e.preventDefault();
+    const { v4: uuidv4 } = require('uuid');
+    
     const product = {
-      id: Date.now(),
+      uuid: uuidv4(),
+      displayId: `PRD${Date.now().toString().slice(-6)}`,
       ...newProduct,
       price: parseFloat(newProduct.price),
       stock: parseInt(newProduct.stock)
@@ -163,7 +167,7 @@ const Products = () => {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {products.map(product => (
-            <div key={product.id} className="bg-white rounded-lg p-6 shadow-sm border">
+            <div key={product.uuid || product.id} className="bg-white rounded-lg p-6 shadow-sm border">
               <div className="flex items-center space-x-3 mb-4">
                 <Package className="text-blue-500" size={24} />
                 <h3 className="text-lg font-semibold">{product.name}</h3>
@@ -184,7 +188,7 @@ const Products = () => {
                 <div className="w-20 h-20 bg-gray-100 rounded border-2 border-dashed border-gray-300 flex items-center justify-center">
                   <div className="text-center">
                     <div className="text-xs font-mono bg-white p-1 rounded">
-                      {product.sku}
+                      {product.displayId || product.sku}
                     </div>
                     <div className="text-xs text-gray-500 mt-1">QR Code</div>
                   </div>

@@ -1,376 +1,308 @@
-import React, { useState, useEffect } from 'react';
-import { toast } from 'react-toastify';
+import React, { useState } from 'react';
+import { Plus, Minus, QrCode, Calculator } from 'lucide-react';
+import { useForm, useFieldArray } from 'react-hook-form';
+import QRScanner from './QRScanner';
+import { api } from '../services/api';
+import toast from 'react-hot-toast';
 
-const InvoiceForm = ({ onSubmit, onCancel, products = [] }) => {
-  const [formData, setFormData] = useState({
-    customer: {
-      name: '',
-      email: '',
-      phone: '',
-      address: '',
-      gstin: ''
-    },
-    items: [{ productID: '', productName: '', quantity: 1, unitPrice: 0, discount: 0, taxRate: 18 }],
-    payment: {
-      method: 'cash',
-      dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-      terms: 'Net 30'
-    },
-    notes: ''
-  });
-
-  const [totals, setTotals] = useState({
-    subtotal: 0,
-    totalTax: 0,
-    totalDiscount: 0,
-    grandTotal: 0
-  });
-
-  // Auto-calculate totals when items change
-  useEffect(() => {
-    calculateTotals();
-  }, [formData.items]);
-
-  const calculateTotals = () => {
-    let subtotal = 0;
-    let totalTax = 0;
-    let totalDiscount = 0;
-
-    formData.items.forEach(item => {
-      const itemTotal = item.quantity * item.unitPrice;
-      const discountAmount = (itemTotal * item.discount) / 100;
-      const taxableAmount = itemTotal - discountAmount;
-      const taxAmount = (taxableAmount * item.taxRate) / 100;
-
-      subtotal += itemTotal;
-      totalDiscount += discountAmount;
-      totalTax += taxAmount;
-    });
-
-    setTotals({
-      subtotal,
-      totalTax,
-      totalDiscount,
-      grandTotal: subtotal - totalDiscount + totalTax
-    });
-  };
-
-  const handleCustomerChange = (field, value) => {
-    setFormData(prev => ({
-      ...prev,
-      customer: { ...prev.customer, [field]: value }
-    }));
-  };
-
-  const handleItemChange = (index, field, value) => {
-    const newItems = [...formData.items];
-    newItems[index] = { ...newItems[index], [field]: value };
-
-    // Auto-fill product details when product is selected
-    if (field === 'productID' && value) {
-      const product = products.find(p => p.productID === value);
-      if (product) {
-        newItems[index] = {
-          ...newItems[index],
-          productName: product.name,
-          unitPrice: product.pricing.sellingPrice,
-          taxRate: product.tax.gstRate
-        };
-      }
+const InvoiceForm = ({ onSubmit, onCancel }) => {
+  const [showQRScanner, setShowQRScanner] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [inputMethod, setInputMethod] = useState('manual');
+  
+  const { register, control, handleSubmit, watch, setValue, reset } = useForm({
+    defaultValues: {
+      customerName: '',
+      customerMobile: '',
+      lines: [{ productId: '', quantity: 1, price: 0, total: 0 }],
+      subtotal: 0,
+      taxAmount: 0,
+      discount: 0,
+      total: 0
     }
-
-    setFormData(prev => ({ ...prev, items: newItems }));
-  };
-
-  const addItem = () => {
-    setFormData(prev => ({
-      ...prev,
-      items: [...prev.items, { productID: '', productName: '', quantity: 1, unitPrice: 0, discount: 0, taxRate: 18 }]
-    }));
-  };
-
-  const removeItem = (index) => {
-    if (formData.items.length > 1) {
-      setFormData(prev => ({
-        ...prev,
-        items: prev.items.filter((_, i) => i !== index)
-      }));
-    }
-  };
-
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  });
+  
+  const { fields, append, remove } = useFieldArray({
+    control,
+    name: 'lines'
+  });
+  
+  const watchedLines = watch('lines');
+  const watchedDiscount = watch('discount');
+  const watchedTaxAmount = watch('taxAmount');
+  
+  // Calculate totals
+  React.useEffect(() => {
+    const subtotal = watchedLines.reduce((sum, line) => {
+      const lineTotal = (line.quantity || 0) * (line.price || 0);
+      setValue(`lines.${watchedLines.indexOf(line)}.total`, lineTotal);
+      return sum + lineTotal;
+    }, 0);
     
-    if (!formData.customer.name) {
-      toast.error('Customer name is required');
-      return;
-    }
-
-    if (formData.items.some(item => !item.productName || item.quantity <= 0)) {
-      toast.error('All items must have valid product and quantity');
-      return;
-    }
-
-    onSubmit(formData);
-  };
-
-  return (
-    <div className="max-w-4xl mx-auto bg-white p-6 rounded-lg shadow">
-      <h2 className="text-2xl font-bold mb-6">Create Invoice</h2>
+    const discount = watchedDiscount || 0;
+    const taxAmount = watchedTaxAmount || 0;
+    const total = subtotal - discount + taxAmount;
+    
+    setValue('subtotal', subtotal);
+    setValue('total', total);
+  }, [watchedLines, watchedDiscount, watchedTaxAmount, setValue]);
+  
+  const handleQRScan = async (qrData) => {
+    try {
+      // Validate QR and get product info
+      const response = await api.post('/qr/validate', { token: qrData });
+      const product = response.data.product;
       
-      <form onSubmit={handleSubmit} className="space-y-6">
+      // Add product to invoice lines
+      const newLine = {
+        productId: product.id,
+        quantity: 1,
+        price: product.price,
+        total: product.price
+      };
+      
+      append(newLine);
+      setInputMethod('qr_scan');
+      setShowQRScanner(false);
+      toast.success(`Added ${product.name} to invoice`);
+    } catch (error) {
+      toast.error('Invalid QR code or product not found');
+    }
+  };
+  
+  const submitInvoice = async (data) => {
+    setIsSubmitting(true);
+    
+    try {
+      const invoiceData = {
+        ...data,
+        inputMethod,
+        lines: data.lines.filter(line => line.productId && line.quantity > 0)
+      };
+      
+      const endpoint = inputMethod === 'qr_scan' ? '/invoices/qr-scan' : '/invoices';
+      const response = await api.post(endpoint, invoiceData);
+      
+      toast.success('Invoice created successfully');
+      onSubmit?.(response.data.data);
+      reset();
+    } catch (error) {
+      toast.error('Failed to create invoice');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+  
+  return (
+    <div className="bg-white rounded-lg shadow-sm border p-6">
+      <div className="flex items-center justify-between mb-6">
+        <h2 className="text-xl font-semibold">Create Invoice</h2>
+        
+        <div className="flex items-center gap-2">
+          <span className={`px-2 py-1 text-xs rounded-full ${
+            inputMethod === 'qr_scan' 
+              ? 'bg-blue-100 text-blue-800' 
+              : 'bg-gray-100 text-gray-800'
+          }`}>
+            {inputMethod === 'qr_scan' ? 'QR Scan' : 'Manual'}
+          </span>
+          
+          <button
+            type="button"
+            onClick={() => setShowQRScanner(true)}
+            className="flex items-center gap-2 px-3 py-2 text-blue-600 hover:bg-blue-50 rounded-lg"
+          >
+            <QrCode className="w-4 h-4" />
+            Scan QR
+          </button>
+        </div>
+      </div>
+      
+      <form onSubmit={handleSubmit(submitInvoice)} className="space-y-6">
         {/* Customer Details */}
-        <div className="border rounded-lg p-4">
-          <h3 className="text-lg font-semibold mb-4">Customer Details</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Customer Name
+            </label>
             <input
-              type="text"
-              placeholder="Customer Name *"
-              value={formData.customer.name}
-              onChange={(e) => handleCustomerChange('name', e.target.value)}
-              className="border rounded px-3 py-2"
-              required
+              {...register('customerName', { required: true })}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              placeholder="Enter customer name"
             />
+          </div>
+          
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Mobile Number
+            </label>
             <input
-              type="email"
-              placeholder="Email"
-              value={formData.customer.email}
-              onChange={(e) => handleCustomerChange('email', e.target.value)}
-              className="border rounded px-3 py-2"
-            />
-            <input
-              type="tel"
-              placeholder="Phone"
-              value={formData.customer.phone}
-              onChange={(e) => handleCustomerChange('phone', e.target.value)}
-              className="border rounded px-3 py-2"
-            />
-            <input
-              type="text"
-              placeholder="GSTIN"
-              value={formData.customer.gstin}
-              onChange={(e) => handleCustomerChange('gstin', e.target.value)}
-              className="border rounded px-3 py-2"
-            />
-            <textarea
-              placeholder="Address"
-              value={formData.customer.address}
-              onChange={(e) => handleCustomerChange('address', e.target.value)}
-              className="border rounded px-3 py-2 md:col-span-2"
-              rows="2"
+              {...register('customerMobile')}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+              placeholder="Enter mobile number"
             />
           </div>
         </div>
-
-        {/* Items */}
-        <div className="border rounded-lg p-4">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold">Items</h3>
+        
+        {/* Invoice Lines */}
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-medium">Items</h3>
             <button
               type="button"
-              onClick={addItem}
-              className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600"
+              onClick={() => append({ productId: '', quantity: 1, price: 0, total: 0 })}
+              className="flex items-center gap-2 px-3 py-2 text-blue-600 hover:bg-blue-50 rounded-lg"
             >
+              <Plus className="w-4 h-4" />
               Add Item
             </button>
           </div>
           
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left p-2">Product</th>
-                  <th className="text-left p-2">Qty</th>
-                  <th className="text-left p-2">Rate</th>
-                  <th className="text-left p-2">Discount%</th>
-                  <th className="text-left p-2">Tax%</th>
-                  <th className="text-left p-2">Amount</th>
-                  <th className="text-left p-2">Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {formData.items.map((item, index) => {
-                  const itemTotal = item.quantity * item.unitPrice;
-                  const discountAmount = (itemTotal * item.discount) / 100;
-                  const taxableAmount = itemTotal - discountAmount;
-                  const taxAmount = (taxableAmount * item.taxRate) / 100;
-                  const totalAmount = taxableAmount + taxAmount;
-
-                  return (
-                    <tr key={index} className="border-b">
-                      <td className="p-2">
-                        <select
-                          value={item.productID}
-                          onChange={(e) => handleItemChange(index, 'productID', e.target.value)}
-                          className="border rounded px-2 py-1 w-full"
-                        >
-                          <option value="">Select Product</option>
-                          {products.map(product => (
-                            <option key={product.productID} value={product.productID}>
-                              {product.name} ({product.sku})
-                            </option>
-                          ))}
-                        </select>
-                        {!item.productID && (
-                          <input
-                            type="text"
-                            placeholder="Product Name"
-                            value={item.productName}
-                            onChange={(e) => handleItemChange(index, 'productName', e.target.value)}
-                            className="border rounded px-2 py-1 w-full mt-1"
-                          />
-                        )}
-                      </td>
-                      <td className="p-2">
-                        <input
-                          type="number"
-                          min="1"
-                          value={item.quantity}
-                          onChange={(e) => handleItemChange(index, 'quantity', parseInt(e.target.value) || 0)}
-                          className="border rounded px-2 py-1 w-20"
-                        />
-                      </td>
-                      <td className="p-2">
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={item.unitPrice}
-                          onChange={(e) => handleItemChange(index, 'unitPrice', parseFloat(e.target.value) || 0)}
-                          className="border rounded px-2 py-1 w-24"
-                        />
-                      </td>
-                      <td className="p-2">
-                        <input
-                          type="number"
-                          min="0"
-                          max="100"
-                          value={item.discount}
-                          onChange={(e) => handleItemChange(index, 'discount', parseFloat(e.target.value) || 0)}
-                          className="border rounded px-2 py-1 w-20"
-                        />
-                      </td>
-                      <td className="p-2">
-                        <input
-                          type="number"
-                          min="0"
-                          value={item.taxRate}
-                          onChange={(e) => handleItemChange(index, 'taxRate', parseFloat(e.target.value) || 0)}
-                          className="border rounded px-2 py-1 w-20"
-                        />
-                      </td>
-                      <td className="p-2 font-semibold">
-                        ₹{totalAmount.toFixed(2)}
-                      </td>
-                      <td className="p-2">
-                        <button
-                          type="button"
-                          onClick={() => removeItem(index)}
-                          className="text-red-500 hover:text-red-700"
-                          disabled={formData.items.length === 1}
-                        >
-                          Remove
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+          <div className="space-y-3">
+            {fields.map((field, index) => (
+              <div key={field.id} className="grid grid-cols-12 gap-3 items-end">
+                <div className="col-span-4">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Product
+                  </label>
+                  <select
+                    {...register(`lines.${index}.productId`, { required: true })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  >
+                    <option value="">Select product</option>
+                    {/* Product options would be loaded from API */}
+                  </select>
+                </div>
+                
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Quantity
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    {...register(`lines.${index}.quantity`, { required: true, min: 1 })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  />
+                </div>
+                
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Price
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    {...register(`lines.${index}.price`, { required: true, min: 0 })}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  />
+                </div>
+                
+                <div className="col-span-2">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Total
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    {...register(`lines.${index}.total`)}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
+                    readOnly
+                  />
+                </div>
+                
+                <div className="col-span-2">
+                  {fields.length > 1 && (
+                    <button
+                      type="button"
+                      onClick={() => remove(index)}
+                      className="w-full px-3 py-2 text-red-600 hover:bg-red-50 rounded-lg"
+                    >
+                      <Minus className="w-4 h-4 mx-auto" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
         </div>
-
+        
         {/* Totals */}
-        <div className="border rounded-lg p-4">
-          <h3 className="text-lg font-semibold mb-4">Totals</h3>
-          <div className="space-y-2 max-w-sm ml-auto">
-            <div className="flex justify-between">
-              <span>Subtotal:</span>
-              <span>₹{totals.subtotal.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Discount:</span>
-              <span>₹{totals.totalDiscount.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between">
-              <span>Tax:</span>
-              <span>₹{totals.totalTax.toFixed(2)}</span>
-            </div>
-            <div className="flex justify-between font-bold text-lg border-t pt-2">
-              <span>Grand Total:</span>
-              <span>₹{totals.grandTotal.toFixed(2)}</span>
-            </div>
-          </div>
-        </div>
-
-        {/* Payment Terms */}
-        <div className="border rounded-lg p-4">
-          <h3 className="text-lg font-semibold mb-4">Payment Terms</h3>
+        <div className="border-t pt-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <select
-              value={formData.payment.method}
-              onChange={(e) => setFormData(prev => ({
-                ...prev,
-                payment: { ...prev.payment, method: e.target.value }
-              }))}
-              className="border rounded px-3 py-2"
-            >
-              <option value="cash">Cash</option>
-              <option value="card">Card</option>
-              <option value="upi">UPI</option>
-              <option value="bank">Bank Transfer</option>
-              <option value="credit">Credit</option>
-            </select>
-            <input
-              type="date"
-              value={formData.payment.dueDate}
-              onChange={(e) => setFormData(prev => ({
-                ...prev,
-                payment: { ...prev.payment, dueDate: e.target.value }
-              }))}
-              className="border rounded px-3 py-2"
-            />
-            <input
-              type="text"
-              placeholder="Payment Terms"
-              value={formData.payment.terms}
-              onChange={(e) => setFormData(prev => ({
-                ...prev,
-                payment: { ...prev.payment, terms: e.target.value }
-              }))}
-              className="border rounded px-3 py-2"
-            />
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Discount
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                {...register('discount')}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                placeholder="0.00"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Tax Amount
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                {...register('taxAmount')}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                placeholder="0.00"
+              />
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Total Amount
+              </label>
+              <div className="flex items-center gap-2">
+                <Calculator className="w-4 h-4 text-gray-500" />
+                <input
+                  type="number"
+                  step="0.01"
+                  {...register('total')}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50 font-medium"
+                  readOnly
+                />
+              </div>
+            </div>
           </div>
         </div>
-
-        {/* Notes */}
-        <div className="border rounded-lg p-4">
-          <h3 className="text-lg font-semibold mb-4">Notes</h3>
-          <textarea
-            placeholder="Additional notes..."
-            value={formData.notes}
-            onChange={(e) => setFormData(prev => ({ ...prev, notes: e.target.value }))}
-            className="border rounded px-3 py-2 w-full"
-            rows="3"
-          />
-        </div>
-
+        
         {/* Actions */}
-        <div className="flex justify-end space-x-4">
+        <div className="flex items-center justify-end gap-3 pt-4 border-t">
           <button
             type="button"
             onClick={onCancel}
-            className="px-6 py-2 border border-gray-300 rounded hover:bg-gray-50"
+            className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
           >
             Cancel
           </button>
           <button
             type="submit"
-            className="px-6 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+            disabled={isSubmitting}
+            className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
           >
-            Create Invoice
+            {isSubmitting ? 'Creating...' : 'Create Invoice'}
           </button>
         </div>
       </form>
+      
+      {/* QR Scanner Modal */}
+      {showQRScanner && (
+        <QRScanner
+          onScan={handleQRScan}
+          onClose={() => setShowQRScanner(false)}
+        />
+      )}
     </div>
   );
 };

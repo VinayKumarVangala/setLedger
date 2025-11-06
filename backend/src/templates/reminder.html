@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Payment Reminder</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 0; padding: 20px; background-color: #f4f4f4; }
+        .container { max-width: 600px; margin: 0 auto; background: white; padding: 30px; border-radius: 8px; }
+        .header { text-align: center; color: #e74c3c; margin-bottom: 30px; }
+        .content { line-height: 1.6; color: #333; }
+        .highlight { background-color: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0; }
+        .amount { font-size: 24px; font-weight: bold; color: #e74c3c; }
+        .footer { margin-top: 30px; padding-top: 20px; border-top: 1px solid #eee; font-size: 12px; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔔 Payment Reminder</h1>
+        </div>
+        
+        <div class="content">
+            <p>Dear {{customerName}},</p>
+            
+            <p>This is a friendly reminder that your payment for Invoice <strong>{{invoiceId}}</strong> is now overdue.</p>
+            
+            <div class="highlight">
+                <p><strong>Outstanding Amount:</strong> <span class="amount">₹{{balanceAmount}}</span></p>
+                <p><strong>Due Date:</strong> {{dueDate}}</p>
+                <p><strong>Days Overdue:</strong> {{daysOverdue}} days</p>
+            </div>
+            
+            <p>Please arrange for the payment at your earliest convenience to avoid any late fees or service interruptions.</p>
+            
+            <p>If you have already made the payment, please ignore this reminder or contact us with the payment details.</p>
+            
+            <p>Thank you for your prompt attention to this matter.</p>
+            
+            <p>Best regards,<br>
+            <strong>setLedger Team</strong></p>
+        </div>
+        
+        <div class="footer">
+            <p>This is an automated reminder from setLedger. Please do not reply to this email.</p>
+        </div>
+    </div>
+</body>
+</html>

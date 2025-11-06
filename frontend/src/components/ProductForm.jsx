@@ -1,313 +1,270 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
-import { toast } from 'react-toastify';
-import { productService } from '../services/api';
+import { Calendar, AlertTriangle } from 'lucide-react';
 
-const ProductForm = ({ product, onSave, onCancel }) => {
-  const [loading, setLoading] = useState(false);
-  const { register, handleSubmit, formState: { errors }, watch, setValue } = useForm({
-    defaultValues: product || {
-      pricing: { costPrice: 0, sellingPrice: 0, mrp: 0 },
-      tax: { gstRate: 18, taxCategory: 'goods' },
-      inventory: { currentStock: 0, minStock: 0, unit: 'pcs' },
-      supplier: {}
+const ProductForm = ({ product, onSubmit, onCancel }) => {
+  const [isPerishable, setIsPerishable] = useState(product?.isPerishable || false);
+  
+  const {
+    register,
+    handleSubmit,
+    watch,
+    formState: { errors },
+    setError,
+    clearErrors
+  } = useForm({
+    defaultValues: {
+      name: product?.name || '',
+      sku: product?.sku || '',
+      price: product?.price || '',
+      stock: product?.stock || 0,
+      isPerishable: product?.isPerishable || false,
+      mfdDate: product?.mfdDate ? new Date(product.mfdDate).toISOString().split('T')[0] : '',
+      expiryDate: product?.expiryDate ? new Date(product.expiryDate).toISOString().split('T')[0] : ''
     }
   });
 
-  const costPrice = watch('pricing.costPrice');
-  const sellingPrice = watch('pricing.sellingPrice');
+  const watchedIsPerishable = watch('isPerishable');
+  const watchedMfdDate = watch('mfdDate');
+  const watchedExpiryDate = watch('expiryDate');
 
-  // Auto-calculate margin
-  useEffect(() => {
-    if (costPrice > 0 && sellingPrice > 0) {
-      const margin = ((sellingPrice - costPrice) / costPrice * 100).toFixed(2);
-      setValue('pricing.margin', parseFloat(margin));
-    }
-  }, [costPrice, sellingPrice, setValue]);
-
-  const onSubmit = async (data) => {
-    setLoading(true);
-    try {
-      if (product) {
-        await productService.updateProduct(product.productID, data);
-        toast.success('Product updated successfully');
-      } else {
-        await productService.createProduct(data);
-        toast.success('Product created successfully');
+  // Custom validation for perishable products
+  const validatePerishableDates = (data) => {
+    clearErrors(['mfdDate', 'expiryDate']);
+    
+    if (data.isPerishable) {
+      if (!data.mfdDate) {
+        setError('mfdDate', {
+          type: 'required',
+          message: 'Manufacturing date is required for perishable products'
+        });
+        return false;
       }
-      onSave();
-    } catch (error) {
-      toast.error(error.response?.data?.error?.message || 'Failed to save product');
-    } finally {
-      setLoading(false);
+      
+      if (!data.expiryDate) {
+        setError('expiryDate', {
+          type: 'required',
+          message: 'Expiry date is required for perishable products'
+        });
+        return false;
+      }
+      
+      const mfdDate = new Date(data.mfdDate);
+      const expiryDate = new Date(data.expiryDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      if (mfdDate > today) {
+        setError('mfdDate', {
+          type: 'validate',
+          message: 'Manufacturing date cannot be in the future'
+        });
+        return false;
+      }
+      
+      if (expiryDate <= mfdDate) {
+        setError('expiryDate', {
+          type: 'validate',
+          message: 'Expiry date must be after manufacturing date'
+        });
+        return false;
+      }
+      
+      if (expiryDate <= today) {
+        setError('expiryDate', {
+          type: 'validate',
+          message: 'Product is already expired'
+        });
+        return false;
+      }
+    }
+    
+    return true;
+  };
+
+  const onFormSubmit = (data) => {
+    if (validatePerishableDates(data)) {
+      // Clean up dates for non-perishable products
+      if (!data.isPerishable) {
+        data.mfdDate = null;
+        data.expiryDate = null;
+      }
+      onSubmit(data);
     }
   };
 
+  const getDaysUntilExpiry = () => {
+    if (!watchedExpiryDate) return null;
+    const expiryDate = new Date(watchedExpiryDate);
+    const today = new Date();
+    const diffTime = expiryDate - today;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    return diffDays;
+  };
+
+  const getExpiryWarning = () => {
+    const daysUntilExpiry = getDaysUntilExpiry();
+    if (daysUntilExpiry === null) return null;
+    
+    if (daysUntilExpiry <= 0) {
+      return { type: 'error', message: 'Product is expired' };
+    } else if (daysUntilExpiry <= 7) {
+      return { type: 'warning', message: `Expires in ${daysUntilExpiry} days` };
+    } else if (daysUntilExpiry <= 30) {
+      return { type: 'info', message: `Expires in ${daysUntilExpiry} days` };
+    }
+    return null;
+  };
+
+  const expiryWarning = getExpiryWarning();
+
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-20 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-medium text-gray-900">
-            {product ? 'Edit Product' : 'Add New Product'}
-          </h3>
-          <button
-            onClick={onCancel}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            <span className="sr-only">Close</span>
-            <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Basic Information */}
-            <div className="space-y-4">
-              <h4 className="text-md font-medium text-gray-900">Basic Information</h4>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Product Name *</label>
-                <input
-                  {...register('name', { required: 'Product name is required' })}
-                  type="text"
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                />
-                {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">SKU *</label>
-                <input
-                  {...register('sku', { required: 'SKU is required' })}
-                  type="text"
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                />
-                {errors.sku && <p className="mt-1 text-sm text-red-600">{errors.sku.message}</p>}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Category *</label>
-                <select
-                  {...register('category', { required: 'Category is required' })}
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="">Select category</option>
-                  <option value="electronics">Electronics</option>
-                  <option value="clothing">Clothing</option>
-                  <option value="food">Food & Beverages</option>
-                  <option value="books">Books</option>
-                  <option value="home">Home & Garden</option>
-                  <option value="sports">Sports</option>
-                  <option value="other">Other</option>
-                </select>
-                {errors.category && <p className="mt-1 text-sm text-red-600">{errors.category.message}</p>}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Description</label>
-                <textarea
-                  {...register('description')}
-                  rows={3}
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-            </div>
-
-            {/* Pricing */}
-            <div className="space-y-4">
-              <h4 className="text-md font-medium text-gray-900">Pricing</h4>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Cost Price *</label>
-                <input
-                  {...register('pricing.costPrice', { 
-                    required: 'Cost price is required',
-                    min: { value: 0, message: 'Cost price must be positive' }
-                  })}
-                  type="number"
-                  step="0.01"
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                />
-                {errors.pricing?.costPrice && <p className="mt-1 text-sm text-red-600">{errors.pricing.costPrice.message}</p>}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Selling Price *</label>
-                <input
-                  {...register('pricing.sellingPrice', { 
-                    required: 'Selling price is required',
-                    min: { value: 0, message: 'Selling price must be positive' }
-                  })}
-                  type="number"
-                  step="0.01"
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                />
-                {errors.pricing?.sellingPrice && <p className="mt-1 text-sm text-red-600">{errors.pricing.sellingPrice.message}</p>}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">MRP</label>
-                <input
-                  {...register('pricing.mrp', { min: { value: 0, message: 'MRP must be positive' } })}
-                  type="number"
-                  step="0.01"
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Margin (%)</label>
-                <input
-                  {...register('pricing.margin')}
-                  type="number"
-                  step="0.01"
-                  readOnly
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm bg-gray-50"
-                />
-              </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Tax Information */}
-            <div className="space-y-4">
-              <h4 className="text-md font-medium text-gray-900">Tax Information</h4>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700">GST Rate (%) *</label>
-                <select
-                  {...register('tax.gstRate', { required: 'GST rate is required' })}
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="0">0%</option>
-                  <option value="5">5%</option>
-                  <option value="12">12%</option>
-                  <option value="18">18%</option>
-                  <option value="28">28%</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">HSN Code</label>
-                <input
-                  {...register('tax.hsnCode')}
-                  type="text"
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Tax Category</label>
-                <select
-                  {...register('tax.taxCategory')}
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="goods">Goods</option>
-                  <option value="services">Services</option>
-                </select>
-              </div>
-            </div>
-
-            {/* Inventory */}
-            <div className="space-y-4">
-              <h4 className="text-md font-medium text-gray-900">Inventory</h4>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Current Stock</label>
-                <input
-                  {...register('inventory.currentStock', { min: { value: 0, message: 'Stock must be positive' } })}
-                  type="number"
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Minimum Stock</label>
-                <input
-                  {...register('inventory.minStock', { min: { value: 0, message: 'Min stock must be positive' } })}
-                  type="number"
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Unit</label>
-                <select
-                  {...register('inventory.unit')}
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="pcs">Pieces</option>
-                  <option value="kg">Kilograms</option>
-                  <option value="ltr">Liters</option>
-                  <option value="box">Box</option>
-                  <option value="pack">Pack</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Location</label>
-                <input
-                  {...register('inventory.location')}
-                  type="text"
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Supplier Information */}
-          <div className="space-y-4">
-            <h4 className="text-md font-medium text-gray-900">Supplier Information</h4>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Supplier Name</label>
-                <input
-                  {...register('supplier.name')}
-                  type="text"
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Contact</label>
-                <input
-                  {...register('supplier.contact')}
-                  type="text"
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700">Email</label>
-                <input
-                  {...register('supplier.email')}
-                  type="email"
-                  className="mt-1 block w-full border-gray-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* Form Actions */}
-          <div className="flex justify-end space-x-3 pt-6 border-t">
-            <button
-              type="button"
-              onClick={onCancel}
-              className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
-            >
-              {loading ? 'Saving...' : (product ? 'Update Product' : 'Create Product')}
-            </button>
-          </div>
-        </form>
+    <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-4">
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Product Name *
+        </label>
+        <input
+          {...register('name', { required: 'Product name is required' })}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        {errors.name && (
+          <p className="mt-1 text-sm text-red-600">{errors.name.message}</p>
+        )}
       </div>
-    </div>
+
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            SKU
+          </label>
+          <input
+            {...register('sku')}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Price *
+          </label>
+          <input
+            type="number"
+            step="0.01"
+            {...register('price', { 
+              required: 'Price is required',
+              min: { value: 0, message: 'Price must be positive' }
+            })}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          {errors.price && (
+            <p className="mt-1 text-sm text-red-600">{errors.price.message}</p>
+          )}
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-1">
+          Initial Stock
+        </label>
+        <input
+          type="number"
+          {...register('stock', { 
+            min: { value: 0, message: 'Stock cannot be negative' }
+          })}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        {errors.stock && (
+          <p className="mt-1 text-sm text-red-600">{errors.stock.message}</p>
+        )}
+      </div>
+
+      <div>
+        <label className="flex items-center space-x-2">
+          <input
+            type="checkbox"
+            {...register('isPerishable')}
+            onChange={(e) => setIsPerishable(e.target.checked)}
+            className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+          />
+          <span className="text-sm font-medium text-gray-700">
+            Perishable Product
+          </span>
+        </label>
+        <p className="mt-1 text-xs text-gray-500">
+          Check if this product has manufacturing and expiry dates
+        </p>
+      </div>
+
+      {/* Conditional MFD/Expiry fields */}
+      {watchedIsPerishable && (
+        <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-md">
+          <div className="flex items-center space-x-2 mb-3">
+            <Calendar className="w-4 h-4 text-yellow-600" />
+            <span className="text-sm font-medium text-yellow-800">
+              Perishable Product Dates
+            </span>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Manufacturing Date *
+              </label>
+              <input
+                type="date"
+                {...register('mfdDate')}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              {errors.mfdDate && (
+                <p className="mt-1 text-sm text-red-600">{errors.mfdDate.message}</p>
+              )}
+            </div>
+            
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Expiry Date *
+              </label>
+              <input
+                type="date"
+                {...register('expiryDate')}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              />
+              {errors.expiryDate && (
+                <p className="mt-1 text-sm text-red-600">{errors.expiryDate.message}</p>
+              )}
+            </div>
+          </div>
+
+          {/* Expiry warning */}
+          {expiryWarning && (
+            <div className={`mt-3 p-2 rounded-md flex items-center space-x-2 ${
+              expiryWarning.type === 'error' ? 'bg-red-50 text-red-700' :
+              expiryWarning.type === 'warning' ? 'bg-yellow-50 text-yellow-700' :
+              'bg-blue-50 text-blue-700'
+            }`}>
+              <AlertTriangle className="w-4 h-4" />
+              <span className="text-sm">{expiryWarning.message}</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="flex justify-end space-x-3 pt-4">
+        <button
+          type="button"
+          onClick={onCancel}
+          className="px-4 py-2 text-sm text-gray-600 hover:text-gray-800"
+        >
+          Cancel
+        </button>
+        <button
+          type="submit"
+          className="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+        >
+          {product ? 'Update Product' : 'Create Product'}
+        </button>
+      </div>
+    </form>
   );
 };
 

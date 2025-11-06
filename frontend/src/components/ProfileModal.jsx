@@ -23,7 +23,7 @@ const ProfileModal = ({ isOpen, onClose, user }) => {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          'x-user-id': user.id
+          'x-user-display-id': user.displayId || user.id
         },
         body: JSON.stringify(formData)
       });
@@ -92,7 +92,13 @@ const ProfileModal = ({ isOpen, onClose, user }) => {
             <Building className="text-blue-500" size={20} />
             <div className="flex-1">
               <label className="block text-sm font-medium text-gray-700">User ID</label>
-              <p className="mt-1 text-gray-900 font-mono text-sm">{user?.id}</p>
+              <p className="mt-1 text-gray-900 font-mono text-sm">{user?.displayId || user?.id}</p>
+              {user?.uuid && (
+                <>
+                  <label className="block text-sm font-medium text-gray-700 mt-2">Internal UUID</label>
+                  <p className="mt-1 text-gray-500 font-mono text-xs">{user.uuid}</p>
+                </>
+              )}
             </div>
           </div>
 

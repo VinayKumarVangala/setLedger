@@ -36,9 +36,11 @@ const Invoices = () => {
 
   const handleCreateInvoice = (e) => {
     e.preventDefault();
+    const { v4: uuidv4 } = require('uuid');
     const total = calculateTotal();
     const invoice = {
-      id: Date.now(),
+      uuid: uuidv4(),
+      displayId: `INV${Date.now().toString().slice(-6)}`,
       customer: newInvoice.customer,
       mobile: newInvoice.mobile,
       paymentMethod: newInvoice.paymentMethod,
@@ -254,11 +256,11 @@ const Invoices = () => {
             </thead>
             <tbody className="divide-y divide-gray-200">
               {invoices.map(invoice => (
-                <tr key={invoice.id}>
+                <tr key={invoice.uuid || invoice.id}>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <FileText className="text-blue-500 mr-2" size={16} />
-                      INV-{invoice.id}
+                      {invoice.displayId || `INV-${invoice.id}`}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-gray-900">{invoice.customer}</td>

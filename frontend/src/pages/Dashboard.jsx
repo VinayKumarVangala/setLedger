@@ -61,7 +61,7 @@ const Dashboard = () => {
             </div>
             <div className="flex items-center space-x-4">
               <span className="text-sm text-gray-600 dark:text-gray-400">
-                Welcome, {user?.name} ({user?.id})
+                Welcome, {user?.name} ({user?.displayId || user?.id})
               </span>
               <button
                 onClick={() => setShowAI(true)}

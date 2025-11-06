@@ -1,0 +1,17 @@
+{
+  "name": "setledger-tests",
+  "version": "1.0.0",
+  "description": "Security and load tests for setLedger",
+  "main": "concurrent-signup-test.js",
+  "scripts": {
+    "test": "node concurrent-signup-test.js",
+    "test:concurrent": "node concurrent-signup-test.js",
+    "test:security": "node concurrent-signup-test.js"
+  },
+  "dependencies": {
+    "node-fetch": "^2.7.0"
+  },
+  "keywords": ["security", "testing", "concurrent", "load-test"],
+  "author": "setLedger Team",
+  "license": "MIT"
+}
